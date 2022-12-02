@@ -7,7 +7,7 @@ if [ -z "$day_number" ]; then
     exit 1
 fi
 
-filename=`find ./src/bin -name "day_${day_number}_*" -printf "%f\n" | head -1 | sed 's/.rs//'`
+filename=`find ./src/bin -name "day_${day_number}_*" -printf "%f\n" | head -1 | sed 's/\.rs//'`
 
 if [ -z "$filename" ]; then
     echo "Cannot find executable for day $day_number"
