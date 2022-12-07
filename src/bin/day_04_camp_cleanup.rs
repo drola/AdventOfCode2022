@@ -3,22 +3,32 @@
 use std::env;
 use std::fs;
 
-fn is_fully_contained(a: u64, b: u64, x: u64, y: u64) -> bool {
-    return (a <= x && b >= y) || (x <= a && y >= b);
+use nom::character::complete::{char, u64};
+use nom::sequence::tuple;
+use nom::IResult;
+
+fn is_fully_contained(l: &Interval, r: &Interval) -> bool {
+    return (l.a <= r.a && l.b >= r.b) || (r.a <= l.a && r.b >= l.b);
 }
 
-fn is_overlapping(a: u64, b: u64, x: u64, y: u64) -> bool {
-    return (a <= x && b >= x) || (x <= a && y >= a);
+fn is_overlapping(l: &Interval, r: &Interval) -> bool {
+    return (l.a <= r.a && l.b >= r.a) || (r.a <= l.a && r.b >= l.a);
 }
 
-fn parse_line(s: &str) -> (u64, u64, u64, u64) {
-    let mut numbers = s.split(&['-', ',']).map(|s| s.parse::<u64>().unwrap());
-    return (
-        numbers.next().unwrap(),
-        numbers.next().unwrap(),
-        numbers.next().unwrap(),
-        numbers.next().unwrap(),
-    );
+#[derive(Debug, PartialEq)]
+struct Interval {
+    a: u64,
+    b: u64,
+}
+
+fn interval(input: &str) -> IResult<&str, Interval> {
+    let (input, (a, _, b)) = tuple((u64, char('-'), u64))(input)?;
+    Ok((input, Interval { a, b }))
+}
+
+fn intervals(input: &str) -> IResult<&str, (Interval, Interval)> {
+    let (input, (l, _, r)) = tuple((interval, char(','), interval))(input)?;
+    Ok((input, (l, r)))
 }
 
 fn main() {
@@ -26,16 +36,22 @@ fn main() {
     let filename = &args[1];
     let contents = fs::read_to_string(filename).expect("Cannot read file");
     let lines = contents.lines();
-    let parsed_lines = lines.map(parse_line);
+    let parsed_lines = lines
+        .map(|l| intervals(l).unwrap().1)
+        .collect::<Vec<(Interval, Interval)>>();
 
-    let count_of_fully_contained = parsed_lines.clone()
-        .map(|(a, b, x, y)| is_fully_contained(a, b, x, y))
+    let count_of_fully_contained = parsed_lines
+        .iter()
+        .map(|(l, r)| is_fully_contained(l, r))
         .filter(|&a| a)
         .count();
-    println!("[part 1] Count of fully contained: {}", count_of_fully_contained);
-    
+    println!(
+        "[part 1] Count of fully contained: {}",
+        count_of_fully_contained
+    );
     let count_of_overlapping = parsed_lines
-        .map(|(a, b, x, y)| is_overlapping(a, b, x, y))
+        .iter()
+        .map(|(l, r)| is_overlapping(l, r))
         .filter(|&a| a)
         .count();
     println!("[part 2] Count of overlapping: {}", count_of_overlapping);
