@@ -36,3 +36,7 @@ fn main() {
 }
 ```
 
+
+### TODO:
+ - Put together utility functions for working with intervals
+ 
