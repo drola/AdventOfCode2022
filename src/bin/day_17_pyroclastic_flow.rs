@@ -1,181 +1,127 @@
-use std::cmp::max;
-use std::cmp::min;
 /// Solution to an Advent of Code problem, day 17, 2022
 /// https://adventofcode.com/2022/day/17
 use std::env;
 use std::fs;
-use std::panic::UnwindSafe;
-use std::str;
 use std::time::Instant;
 
-const ROCK: u8 = "#".as_bytes()[0];
-const EMPTY: u8 = ".".as_bytes()[0];
 const LEFT: u8 = "<".as_bytes()[0];
-const RIGHT: u8 = ">".as_bytes()[0];
+const N: usize = 128;
 
-fn is_legal_position(
-    tower: &Vec<[u8; 7]>,
-    rock_pattern: &[[u8; 4]; 4],
-    bottom: i64,
-    left: i64,
-) -> bool {
-    if bottom as usize >= tower.len() {
-        //println!("bottom ({}) >= tower.len() ({})", bottom, tower.len());
+fn is_legal_position_u8(tower: &[u8; N], rock_pattern: [u8; 4], top: i64, left: i64) -> bool {
+    if top < 0 || left < 0 {
         return false;
     }
 
     for y in 0..(4 as i64) {
-        for x in 0..(4 as i64) {
-            if rock_pattern[y as usize][x as usize] == ROCK
-                && ((left + x) >= 7
-                    || (left + x) < 0
-                    || tower[(bottom - 3 + y) as usize][(left + x) as usize] == ROCK)
-            {
-                //println!("left+x = {}, bottom-3+y={}", left+x, bottom-3+y);
-                return false;
-            }
+        let line = rock_pattern[y as usize] >> left;
+        if line & 0b00000001 > 0 {
+            return false;
+        }
+        if line & tower[(top + y) as usize % N] > 0 {
+            return false;
         }
     }
     return true;
 }
 
-fn settle(tower: &mut Vec<[u8; 7]>, rock_pattern: &[[u8; 4]; 4], bottom: i64, left: i64) -> usize {
-    let mut highest_rock = bottom as usize;
+fn settle_u8(tower: &mut [u8; N], rock_pattern: [u8; 4], top: i64, left: i64) -> i64 {
+    let mut highest_rock = top;
     for y in 0..(4 as i64) {
-        for x in 0..(4 as i64) {
-            if rock_pattern[y as usize][x as usize] == ROCK {
-                tower[(bottom - 3 + y) as usize][(left + x) as usize] = ROCK;
-                highest_rock = min(highest_rock, (bottom - 3 + y) as usize);
-            }
+        let i = (top + y) as usize % N;
+        tower[i] = tower[i] | (rock_pattern[y as usize] >> left);
+        if tower[i] > 0 {
+            highest_rock = top + y;
         }
     }
     return highest_rock;
-}
-
-fn draw(tower: &Vec<[u8; 7]>) {
-    for y in (0..20).rev() {
-        println!("|{}|", str::from_utf8(&tower[tower.len() - y - 1]).unwrap());
-    }
-
-    println!("+-------+");
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = &args[1];
     let contents = fs::read_to_string(filename).expect("Cannot read file");
-    let jets = contents.lines().next().unwrap().as_bytes();
+    let jets = contents
+        .lines()
+        .next()
+        .unwrap()
+        .as_bytes()
+        .iter()
+        .map(|&b| match b {
+            LEFT => -1,
+            _ => 1,
+        })
+        .collect::<Vec<i64>>();
+    let jets_len = jets.len();
 
-    let rock_pattern_0 = [
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [ROCK, ROCK, ROCK, ROCK],
-    ];
-    let rock_pattern_1 = [
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [EMPTY, ROCK, EMPTY, EMPTY],
-        [ROCK, ROCK, ROCK, EMPTY],
-        [EMPTY, ROCK, EMPTY, EMPTY],
-    ];
-    let rock_pattern_2 = [
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [EMPTY, EMPTY, ROCK, EMPTY],
-        [EMPTY, EMPTY, ROCK, EMPTY],
-        [ROCK, ROCK, ROCK, EMPTY],
-    ];
-    let rock_pattern_3 = [
-        [ROCK, EMPTY, EMPTY, EMPTY],
-        [ROCK, EMPTY, EMPTY, EMPTY],
-        [ROCK, EMPTY, EMPTY, EMPTY],
-        [ROCK, EMPTY, EMPTY, EMPTY],
-    ];
-    let rock_pattern_4 = [
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [EMPTY, EMPTY, EMPTY, EMPTY],
-        [ROCK, ROCK, EMPTY, EMPTY],
-        [ROCK, ROCK, EMPTY, EMPTY],
-    ];
+    let mut rock_pattern_0_u8 = [0b00000000, 0b00000000, 0b00000000, 0b11110000];
+    let mut rock_pattern_1_u8 = [0b00000000, 0b01000000, 0b11100000, 0b01000000];
+    let mut rock_pattern_2_u8 = [0b00000000, 0b00100000, 0b00100000, 0b11100000];
+    let mut rock_pattern_3_u8 = [0b10000000, 0b10000000, 0b10000000, 0b10000000];
+    let mut rock_pattern_4_u8 = [0b00000000, 0b00000000, 0b11000000, 0b11000000];
+    rock_pattern_0_u8.reverse();
+    rock_pattern_1_u8.reverse();
+    rock_pattern_2_u8.reverse();
+    rock_pattern_3_u8.reverse();
+    rock_pattern_4_u8.reverse();
 
-    let rock_patterns = [
-        rock_pattern_0,
-        rock_pattern_1,
-        rock_pattern_2,
-        rock_pattern_3,
-        rock_pattern_4,
+    let rock_patterns_u8 = [
+        rock_pattern_0_u8,
+        rock_pattern_1_u8,
+        rock_pattern_2_u8,
+        rock_pattern_3_u8,
+        rock_pattern_4_u8,
     ];
 
-    let mut tower = vec![[EMPTY; 7]; 2022 * 4 + 10];
-    let mut highest_rock = tower.len(); // current highest rock (or floor)
+    //let mut tower = vec![0 as u8; 2022 * 4 + 10];
+    let mut tower = [0 as u8; N];
+    let mut highest_rock = -1;
     let mut jet_index: usize = 0;
     let t_start = Instant::now();
-    let mut max_heights_spread = 0;
-    for rock_i in 0..2022 {
-        //println!("Rock {}", rock_i);
-
+    for rock_i in 0..1000000000000 {
         let mut left: i64 = 2;
-        let mut bottom: i64 = highest_rock as i64 - 4;
-        let rock_pattern = &rock_patterns[rock_i % rock_patterns.len()];
+        let mut top: i64 = highest_rock + 4;
+        let rock_pattern = rock_patterns_u8[rock_i % 5];
+        /*tower[(highest_rock+1) as usize % N] = 0;
+        tower[(highest_rock+2) as usize % N] = 0;
+        tower[(highest_rock+3) as usize % N] = 0;
+        tower[(highest_rock+4) as usize % N] = 0;*/
+        tower[(highest_rock + 5) as usize % N] = 0;
+        tower[(highest_rock + 6) as usize % N] = 0;
+        tower[(highest_rock + 7) as usize % N] = 0;
+        tower[(highest_rock + 8) as usize % N] = 0;
 
         loop {
-            /*match jets[jet_index] {
-                LEFT => println!("Jet left!"),
-                _ => println!("Jet right!"),
-            }*/
-            let left_after_jet = match jets[jet_index] {
-                LEFT => left - 1,
-                _ => left + 1,
-            };
-            if is_legal_position(&tower, rock_pattern, bottom, left_after_jet) {
-                //println!("Jet applied; left = {}", left_after_jet);
+            let left_after_jet = left + jets[jet_index];
+
+            if is_legal_position_u8(&tower, rock_pattern, top, left_after_jet) {
                 left = left_after_jet;
-            } else {
-                //println!("({},{}) would not be a legal position.", bottom, left_after_jet);
             }
 
-            jet_index = (jet_index + 1) % jets.len();
+            jet_index = (jet_index + 1) % jets_len;
 
-            if !is_legal_position(&tower, rock_pattern, bottom + 1, left) {
-                highest_rock = min(highest_rock, settle(&mut tower, rock_pattern, bottom, left));
-                /*println!(
-                    "Settle at {}, {}; highest rock = {}",
-                    bottom, left, highest_rock
-                );*/
+            if !is_legal_position_u8(&tower, rock_pattern, top - 1, left) {
+                let new_highest = settle_u8(&mut tower, rock_pattern, top, left);
+                if new_highest > highest_rock {
+                    highest_rock = new_highest;
+                }
+                //highest_rock = max(highest_rock, settle_u8(&mut tower, rock_pattern, top, left));
                 break;
             }
-            bottom = bottom + 1;
+            top = top - 1;
         }
 
-        //draw(&tower);
-
-        /*let mut max_heights = [0 as usize; 7];
-        for (y, row) in tower.iter().enumerate() {
-            for i in 0..7 {
-                if row[i] == ROCK {
-                    max_heights[i] = max(max_heights[i], tower.len() - y);
-                }
-            }
+        if rock_i == 2021 {
+            println!("Tower height [part 1]: {}", highest_rock + 1);
         }
-        println!("{:?}", max_heights);
-        max_heights_spread = max(
-            max_heights_spread,
-            max_heights.iter().max().unwrap() - max_heights.iter().min().unwrap(),
-        );*/
     }
     println!("{:?}", Instant::now().duration_since(t_start));
-    println!(
-        "Tower height [part 1]: {} ({}-{})",
-        tower.len() - highest_rock,
-        tower.len(),
-        highest_rock
-    );
+    println!("Tower height [part 2]: {}", highest_rock + 1);
 
     //println!("Max heights spread: {}", max_heights_spread);
 
     // TODO: Simulate 1000000000000 rocks. = 10^12
     // TODO: This means recycling tower memory. Possibly optimizing the algorithm.
     // theoretically, it might be possible to do 10^8 - 10^9 rocks/second.
-
 
     // Debug build:
     // 10ms for 2022 rocks
@@ -188,7 +134,12 @@ fn main() {
     // 2*10^5s for 2*10^12 rocks = cca 3h?
     // TODO: Next step: replace [u8;7] with u8
 
-
+    // u8 version:
+    // 100us for 2022 rocks;
+    // 10^-4s for 2*10^3 rocks
+    // 10^-1s for 2*10^6 rocks
+    // 10^2s for 2*10^9 rocks
+    // 0.5 * 10^5s for 10^12 rocks = 13hr
 
     // soooo... ??
     // perhaps the pattern repeats?
@@ -198,4 +149,8 @@ fn main() {
     // floor pattern is up to 50 cells high;
     // therefore, the floor has 2^(50*7) states.
     // kilo (10^3), mega (10^6), giga (10^9)
+
+    // 31ms for 1e6 == 0.031s for 1e6
+    // 31s for 1e9
+    // 31.000s for 1e12 = ~10h
 }
