@@ -4,7 +4,6 @@
 use std::env;
 use std::fs;
 
-
 use itertools::Itertools;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -195,7 +194,7 @@ fn main() {
     let _root_index = find_monkey_index(ROOT, &monkeys_part_2);
     let mut root_monkey_left: Name = BLANK;
     let mut root_monkey_right: Name = BLANK;
-    for  m in monkeys_part_2.iter() {
+    for m in monkeys_part_2.iter() {
         match m {
             Monkey::CalculatingMonkey {
                 name,
